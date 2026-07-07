@@ -271,15 +271,26 @@ def main():
         n_jobs=-1
     )
 
+    # Entrenar búsqueda de hiperparámetros para Random Forest
     grid_rf.fit(X_train, y_train)
 
-    final_model = grid_rf.best_estimator_
+    # Guardamos Random Forest optimizado como modelo auxiliar de interpretabilidad,
+    # no como modelo final predictivo.
+    rf_interpretability_model = grid_rf.best_estimator_
+
+    # =========================
+    # Modelo final predictivo:
+    # KNN
+    # =========================
+
+    # final_model = grid_rf.best_estimator_
+    final_model = trained_models["KNN"]
 
     y_pred_final = final_model.predict(X_test)
     y_proba_final = final_model.predict_proba(X_test)[:, 1]
 
     final_result = evaluate_classification(
-        "Random Forest optimizado",
+        "KNN",
         y_test,
         y_pred_final,
         y_proba_final
@@ -290,10 +301,16 @@ def main():
         index=False
     )
 
-    # Guardar modelo final
+    # Guardar modelo final predictivo: KNN
     joblib.dump(
         final_model,
         results_dir / "modelo_final_heart_risk.pkl"
+    )
+
+    # Guardar modelo auxiliar de interpretabilidad: Random Forest optimizado
+    joblib.dump(
+        rf_interpretability_model,
+        results_dir / "modelo_interpretabilidad_random_forest.pkl"
     )
 
     # Guardar matriz de confusión
@@ -301,7 +318,7 @@ def main():
         y_test,
         y_pred_final,
         output_path=figures_dir / "matriz_confusion_modelo_final.png",
-        title="Matriz de confusión - Modelo final"
+        title="Matriz de confusión - Modelo final KNN"
     )
 
     # Guardar curva ROC
@@ -309,15 +326,15 @@ def main():
         y_test,
         y_proba_final,
         output_path=figures_dir / "curva_roc_modelo_final.png",
-        title="Curva ROC - Modelo final"
+        title="Curva ROC - Modelo final KNN"
     )
 
     # =========================
     # 7. Importancia de variables
     # =========================
 
-    preprocessor_fitted = final_model.named_steps["preprocessor"]
-    rf_model = final_model.named_steps["model"]
+    preprocessor_fitted = rf_interpretability_model.named_steps["preprocessor"]
+    rf_model = rf_interpretability_model.named_steps["model"]
 
     feature_names = preprocessor_fitted.get_feature_names_out()
     importances = rf_model.feature_importances_
@@ -396,10 +413,10 @@ def main():
     print("\nResultados de validación cruzada:")
     print(df_cv_results)
 
-    print("\nMejores parámetros Random Forest:")
+    print("\nMejores parámetros Random Forest auxiliar:")
     print(grid_rf.best_params_)
 
-    print("\nResultado modelo final:")
+    print("\nResultado modelo final predictivo KNN:")
     print(final_result)
 
     print("\nArchivos guardados en results/.")
